@@ -505,7 +505,7 @@ def main_menu():
     cutoff = 50
     date = today
     update = True
-    data_path = "\\output\\"
+    data_path = "data\\"
     
     options = ["Select league",
                "Change history range",
