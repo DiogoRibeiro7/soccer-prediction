@@ -422,7 +422,7 @@ def get_league():
                   ("Slovenia", "1.-SNL"),
                   ("South-Africa", "PSL"),
                   ("Spain", "La-Liga"),
-                  ("Spain", "Segunda-División"),
+                  ("Spain", "Segunda-Division"),
                   ("Sweden", "Allsvenskan"),
                   ("Sweden", "Superettan"),
                   ("Switzerland", "Challenge-League"),
