@@ -378,52 +378,57 @@ def get_league():
     """
     # List of available leagues
     league_list = [("Australia", "A-League"),
-                   ("Austria", "Bundesliga"),
-                   ("Austria", "2.-Liga"),
-                   ("Belgium", "First-Division-A"),
-                   ("Belgium", "First-Division-B"),
-                   ("Bulgaria", "First-League"),
-                   ("Croatia", "1.-HNL"),
-                   ("Croatia", "2.-HNL"),
-                   ("Denmark", "Superliga"),
-                   ("Denmark", "1st-Division"),
-                   ("Egypt", "Premier-League"),
-                   ("England", "Premier-League"),
-                   ("England", "Championship"),
-                   ("England", "League-One"),
-                   ("England", "League-Two"),
-                   ("France", "Ligue-1"),
-                   ("France", "Ligue-2"),
-                   ("Germany", "Bundesliga"),
-                   ("Germany", "2-Bundesliga"),
-                   ("Germany", "3.-Liga"),
-                   ("Hungary", "NB-I"),
-                   ("Indonesia", "Liga-1"),
-                   ("Italy", "Serie-A"),
-                   ("Italy", "Serie-B"),
-                   ("Italy", "Serie-C"),
-                   ("Netherlands", "Eredivisie"),
-                   ("Netherlands", "Eerste-Divisie"),
-                   ("Norway", "Eliteserien"),
-                   ("Norway", "1.-Division"),
-                   ("Poland", "Ekstraklasa"),
-                   ("Poland", "I-Liga"),
-                   ("Portugal", "Primeira-Liga"),
-                   ("Portugal", "Segunda-Liga"),
-                   ("Saudi-Arabia", "Pro-League"),
-                   ("Scotland", "Premiership"),
-                   ("Scotland", "Championship"),
-                   ("Scotland", "League-One"),
-                   ("Scotland", "League-Two"),
-                   ("Slovakia", "Super-Liga"),
-                   ("Slovenia", "1.-SNL"),
-                   ("South-Africa", "PSL"),
-                   ("Spain", "La-Liga"),
-                   ("Spain", "Segunda-División"),
-                   ("Sweden", "Allsvenskan"),
-                   ("Sweden", "Superettan"),
-                   ("Switzerland", "Challenge-League"),
-                   ("Switzerland", "Super-League")]
+                  ("Austria", "Bundesliga"),
+                  ("Austria", "2.-Liga"),
+                  ("Belgium", "First-Division-A"),
+                  ("Belgium", "First-Division-B"),
+                  ("Bulgaria", "First-League"),
+                  ("Bulgaria", "Second-League"),
+                  ("Croatia", "1.-HNL"),
+                  ("Croatia", "2.-HNL"),
+                  ("Cyprus", "1.-Division"),
+                  ("Denmark", "Superliga"),
+                  ("Denmark", "1st-Division"),
+                  ("Egypt", "Premier-League"),
+                  ("England", "Premier-League"),
+                  ("England", "Championship"),
+                  ("England", "League-One"),
+                  ("England", "League-Two"),
+                  ("Europe", "UEFA-Champions-League"),
+                  ("France", "Ligue-1"),
+                  ("France", "Ligue-2"),
+                  ("Germany", "Bundesliga"),
+                  ("Germany", "2-Bundesliga"),
+                  ("Germany", "3.-Liga"),
+                  ("Hungary", "NB-I"),
+                  ("Indonesia", "Liga-1"),
+                  ("Italy", "Serie-A"),
+                  ("Italy", "Serie-B"),
+                  ("Italy", "Serie-C"),
+                  ("Netherlands", "Eredivisie"),
+                  ("Netherlands", "Eerste-Divisie"),
+                  ("Norway", "Eliteserien"),
+                  ("Norway", "1.-Division"),
+                  ("Poland", "Ekstraklasa"),
+                  ("Poland", "I-Liga"),
+                  ("Portugal", "Primeira-Liga"),
+                  ("Portugal", "Segunda-Liga"),
+                  ("Saudi-Arabia", "Pro-League"),
+                  ("Scotland", "Premiership"),
+                  ("Scotland", "Championship"),
+                  ("Scotland", "League-One"),
+                  ("Scotland", "League-Two"),
+                  ("Slovakia", "Super-Liga"),
+                  ("Slovenia", "1.-SNL"),
+                  ("South-Africa", "PSL"),
+                  ("Spain", "La-Liga"),
+                  ("Spain", "Segunda-División"),
+                  ("Sweden", "Allsvenskan"),
+                  ("Sweden", "Superettan"),
+                  ("Switzerland", "Challenge-League"),
+                  ("Switzerland", "Super-League"),
+                  ("Turkey", "Super-Lig"),
+                  ("Turkey", "1.-Lig")]
     # enumerated list
     numbered_league_list = list(enumerate(league_list,1))
     # list of acceptable inputs
@@ -521,14 +526,16 @@ def main_menu():
     history = 100
     cutoff = 50
     date = today
-    update = True
+    update = False
+    test = False
     data_path = "data\\"
     
     options = ["Select league",
                "Change history range",
                "Change probability cutoff",
                "Change game date",
-               "Change update requesting",
+               "Switch update requesting",
+               "Switch test mode",
                "Run predictions",
                "Exit"
                ]
@@ -547,6 +554,10 @@ def main_menu():
             print("Update requesting is on")
         else:
             print("Update requesting is off")
+        if test:
+            print("Test mode is on")
+        else:
+            print("Test mode is off")
         print()
         for option in numbered_options:
             print(option[0], option[1])
@@ -562,21 +573,33 @@ def main_menu():
             cutoff = get_cutoff()
         if option_sel == "Change game date":
             date = get_date()
-        if option_sel == "Change update requesting":
+        if option_sel == "Switch update requesting":
             update = not update
+        if option_sel == "Switch test mode":
+            test = not test
         if option_sel == "Run predictions":
             if update:
                 data = updatecompetitiondata(selected_league[0], selected_league[1], 2014, data_path)
             else:
                 data = getcompetitiondata(selected_league[0], selected_league[1], 2014, data_path)
-                
-            # do the prediction - now takes number of historical games to use rather than using everything
-            # added cutoff option which will printout game predictions with a probability higher than the cutoff
-            data = poissonpredict(data, date.strftime("%Y-%m-%d"), history, cutoff)
-        
-            # save our predictions
-            filename = data_path + selected_league[0] + "-" + selected_league[1].replace(" ", "-").replace("/", "-") + ".csv"
-            data.to_csv(filename)
+            
+            if test:
+                besthistory, bestcutoff, bestscore = runtests(data, testdays=60)
+                print("Score of {0:.2f}% with history setting of {1} and cutoff of {2}".format(bestscore, besthistory, bestcutoff))
+                confirmscore = confirmtests(data, besthistory, bestcutoff, testdays=60)
+                print("Validation score of {0:.2f}%".format(confirmscore))
+            
+                print("If the above scores seem acceptable, you should use these options")
+                print("soccerprediction.py -c \"{0}\" -l \"{1}\" -y {2} -b {3}".format(selected_league[0], selected_league[1], besthistory, bestcutoff))
+                print("\nGood Luck!")
+            else:
+                # do the prediction - now takes number of historical games to use rather than using everything
+                # added cutoff option which will printout game predictions with a probability higher than the cutoff
+                data = poissonpredict(data, date.strftime("%Y-%m-%d"), history, cutoff)
+            
+                # save our predictions
+                filename = data_path + selected_league[0] + "-" + selected_league[1].replace(" ", "-").replace("/", "-") + ".csv"
+                data.to_csv(filename)
         if option_sel == "Exit":
             break            
 main_menu()
