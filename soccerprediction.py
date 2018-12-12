@@ -101,7 +101,7 @@ def getcompetitiondata(country, comp, startseason, datapath):
 
         # scrape each season
         for s in range(startseason, currentseason + 1):
-            seasondata.append(scrapeseason(country, competition, s))
+            seasondata.append(scrapeseason(country, comp, s)) # comp was competition here (assumed fix) - Pringleman
 
         # combine our data to one frame
         data = pd.concat(seasondata)
@@ -332,8 +332,9 @@ def confirmtests(data, history, cutoff, testdays=30):
     return score
 
 
+"""
+Old code
 todaysdate = datetime.date.today().strftime("%Y-%m-%d")
-
 # initialise parser object to read from command line
 parser = argparse.ArgumentParser()
 
@@ -346,6 +347,225 @@ parser.add_argument("-p", "--path", default="data/", help="Path to store data fi
 parser.add_argument("-y", "--history", default=100, type=int, help="Number of historical games to consider")
 parser.add_argument("-t", "--test", action="store_true", help="Run tests to find best history length and cutoff values")
 parser.add_argument("-b", "--cutoff", default=-1, type=int, help="Cutoff probability for betting")
+"""
+
+def is_number(s) -> bool:
+    """
+    Tests if the value passed is a number.
+    Returns True or False.
+    """
+    if isinstance(s, str):
+        s = s.strip()
+        return s.isnumeric()
+    return isinstance(s, int) or isinstance(s, float)
+
+def input_number():
+    """
+    Asks the user to enter a number.
+    Validates the input and returns the given number.
+    """
+    while True:
+        number = input()
+        if is_number(number):
+            number = int(number)
+            break
+    return number
+
+def get_league():
+    """
+    Asks the user to select a league.
+    Returns the country and league for the selection as a tuple.
+    """
+    # List of available leagues
+    league_list = [("Australia", "A-League"),
+                    ("Austria", "Bundesliga"),
+                    ("Austria", "2.-Liga"),
+                    ("Belgium", "First-Division-A"),
+                    ("Belgium", "First-Division-B"),
+                    ("Bulgaria", "First-League"),
+                    ("Croatia", "1.-HNL"),
+                    ("Croatia", "2.-HNL"),
+                    ("Denmark", "Superliga"),
+                    ("Denmark", "1st-Division"),
+                    ("England", "Premier-League"),
+                    ("England", "Championship"),
+                    ("England", "League-One"),
+                    ("England", "League-Two"),
+                    ("Germany", "Bundesliga"),
+                    ("Germany", "2-Bundesliga"),
+                    ("Germany", "3.-Liga"),
+                    ("Hungary", "NB-I"),
+                    ("Indonesia", "Liga-1"),
+                    ("Italy", "Serie-A"),
+                    ("Italy", "Serie-B"),
+                    ("Italy", "Serie-C"),
+                    ("Netherlands", "Eredivisie"),
+                    ("Netherlands", "Eerste-Divisie"),
+                    ("Norway", "Eliteserien"),
+                    ("Norway", "1.-Division"),
+                    ("Poland", "Ekstraklasa"),
+                    ("Poland", "I-Liga"),
+                    ("Portugal", "Primeira-Liga"),
+                    ("Portugal", "Segunda-Liga")]
+    # enumerated list
+    numbered_league_list = list(enumerate(league_list,1))
+    # list of acceptable inputs
+    available_leagues = []
+    # populate the list of available inputs
+    for league in numbered_league_list:
+        available_leagues.append(league[0])
+    # Set a clear selector variable
+    league_sel = ""
+    # Get validated user input
+    while league_sel not in available_leagues:
+        for league in numbered_league_list:
+            print(league[0], league[1], sep="\t")
+        print("\nPlease enter a number for one of the above leagues")
+        league_sel = input_number()
+    # Return selected country league tuple.
+    return league_list[league_sel-1]
+
+def manual_date():
+    """
+    Asks the user to enter a manual date.
+    Validates it and returns a relecant datetime object.
+    """
+    this_year = datetime.datetime.today().year
+    
+    valid_date = False
+    while valid_date == False:
+        day = 0
+        month = 0
+        year = 0
+        while day < 1 or day > 31:
+            print("Enter date day (1- 31)", end = "")
+            day = input_number()
+        while month < 1 or month > 12:
+            print("Enter date month (1 - 12)", end = "")
+            month = input_number()
+        while year != this_year and year != this_year + 1:
+            print("Enter date year (" + str(this_year) + " or " + str (this_year + 1) + ")", end = "")
+            year = input_number()
+        try:
+            date = datetime.datetime(year, month, day)
+            valid_date = True
+        except ValueError:
+            print("\nNot a valid date\n")
+    return date
+
+def get_date():
+    """
+    Asks the user for a date.
+    Returns the selected date.
+    """
+    today = datetime.datetime.today()
+    # List of available options.
+    options = ["Today", "Tomorrow", "Manual date entry"]
+    # enumerated list
+    numbered_options = list(enumerate(options,1))
+    # list of available inputs
+    available_options = []
+    # populate the list of available inputs
+    for option in numbered_options:
+        available_options.append(option[0])
+    # Set a clear selector variable
+    option_sel = ""
+    # Get validated user input
+    while option_sel not in available_options:
+        for option in numbered_options:
+            print(option[0], option[1], sep = "\t")
+        print("\nPlease select one of the above options")
+        option_sel = input_number()
+        
+    option_sel = options[option_sel-1]
+    
+    if option_sel == "Today":
+        return today
+    elif option_sel == "Tomorrow":
+        return today + datetime.timedelta(days = 1)
+    elif option_sel == "Manual date entry":
+        return manual_date()
+
+def get_history():
+    print("Enter number of past games to consider")
+    days = input_number()
+    return days
+
+def get_cutoff():
+    cutoff = 101
+    while cutoff < 0 or cutoff > 100:
+        print("Enter probability percentage cut off (0 - 100)")
+        cutoff = input_number()
+    return cutoff
+
+def main_menu():
+    today = datetime.date.today()
+    selected_league = ("England", "Premier-League")
+    history = 100
+    cutoff = 50
+    date = today
+    update = True
+    data_path = "\\output\\"
+    
+    options = ["Select league",
+               "Change history range",
+               "Change probability cutoff",
+               "Change game date",
+               "Change update requesting",
+               "Run predictions",
+               "Exit"
+               ]
+    numbered_options = list(enumerate(options, 1))
+    available_options = []
+    for option in numbered_options:
+        available_options.append(option[0])
+    option_sel = ""
+    while True:
+        print()
+        print("Selected league: " + selected_league[0] + "'s " + selected_league[1])
+        print("History range: " + str(history) + " days")
+        print("Probability cutoff: " + str(cutoff) + "%")
+        print("Date (day/month/year):" + str(date.day) + "/" + str(date.month) + "/" + str(date.year))
+        if update:
+            print("Update requesting is on")
+        else:
+            print("Update requesting is off")
+        print()
+        for option in numbered_options:
+            print(option[0], option[1])
+        print("\nPlease select one of the above options")
+        option_sel = input_number()
+        if option_sel in available_options:
+            option_sel = options[option_sel - 1]
+        if option_sel == "Select league":
+            selected_league = get_league()
+        if option_sel == "Change history range":
+            history = get_history()
+        if option_sel == "Change probability cutoff":
+            cutoff = get_cutoff()
+        if option_sel == "Change game date":
+            date = get_date()
+        if option_sel == "Change update requesting":
+            update = not update
+        if option_sel == "Run predictions":
+            if update:
+                data = updatecompetitiondata(selected_league[0], selected_league[1], 2014, data_path)
+            else:
+                data = getcompetitiondata(selected_league[0], selected_league[1], 2014, data_path)
+                
+            # do the prediction - now takes number of historical games to use rather than using everything
+            # added cutoff option which will printout game predictions with a probability higher than the cutoff
+            data = poissonpredict(data, date.strftime("%Y-%m-%d"), history, cutoff)
+        
+            # save our predictions
+            filename = data_path + selected_league[0] + "-" + selected_league[1].replace(" ", "-").replace("/", "-") + ".csv"
+            data.to_csv(filename)
+        if option_sel == "Exit":
+            break            
+main_menu()
+        
+"""
+Old args system
 
 # parse the arguments from the command line input and store them in the args variable
 args = parser.parse_args()
@@ -358,6 +578,7 @@ datapath = args.path
 history = args.history
 testmode = args.test
 cutoff = args.cutoff
+
 
 # if update requested then update, otherwise just use the existing data
 if args.update:
@@ -383,3 +604,4 @@ else:
     # save our predictions
     filename = datapath + country + "-" + competition.replace(" ", "-").replace("/", "-") + ".csv"
     data.to_csv(filename)
+"""
