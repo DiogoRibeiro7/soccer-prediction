@@ -371,7 +371,7 @@ def input_number():
             break
     return number
 
-def get_league():
+def get_leagues(selected_leagues):
     """
     Asks the user to select a league.
     Returns the country and league for the selection as a tuple.
@@ -428,24 +428,40 @@ def get_league():
                   ("Switzerland", "Challenge-League"),
                   ("Switzerland", "Super-League"),
                   ("Turkey", "Super-Lig"),
-                  ("Turkey", "1.-Lig")]
+                  ("Turkey", "1.-Lig"),
+                  ("United-Arab-Emirates", "Arabian-Gulf-League")]
     # enumerated list
     numbered_league_list = list(enumerate(league_list,1))
     # list of acceptable inputs
     available_leagues = []
     # populate the list of available inputs
     for league in numbered_league_list:
-        available_leagues.append(league[0])
+        available_leagues.append(str(league[0]))
     # Set a clear selector variable
     league_sel = ""
     # Get validated user input
-    while league_sel not in available_leagues:
-        for league in numbered_league_list:
+    def check_selected(league_sel, selected_leagues, league_list):
+        if league_list[league_sel - 1] in selected_leagues:
+                print(str(league_list[league_sel - 1][0] + "'s " + str(league_list[league_sel -1][1]) + " is already selected."))
+        else:
+                selected_leagues.append(league_list[league_sel - 1])
+                print(str(league_list[league_sel - 1][0] + "'s " + str(league_list[league_sel -1][1]) + " selected."))
+    
+    for league in numbered_league_list:
             print(str(league[0]) + ") " + league[1][0] + "'s " + league[1][1])
-        print("\nPlease enter a number for one of the above leagues")
-        league_sel = input_number()
-    # Return selected country league tuple.
-    return league_list[league_sel-1]
+    print("\nPlease enter a number for one of the above leagues.\nEnter \"All\" for all leagues. Enter \"0\" when done.")
+                    
+    while True:
+        league_sel = input()
+        if league_sel in available_leagues:
+            check_selected(int(league_sel), selected_leagues, league_list)
+        if league_sel.lower() == "all":
+            for league in available_leagues:
+                check_selected(int(league), selected_leagues, league_list)
+        if league_sel == "0":
+            break
+    return selected_leagues
+        
 
 def manual_date():
     """
@@ -522,7 +538,7 @@ def get_cutoff():
 
 def main_menu():
     today = datetime.date.today()
-    selected_league = ("England", "Premier-League")
+    selected_leagues = []
     history = 100
     cutoff = 50
     date = today
@@ -530,13 +546,14 @@ def main_menu():
     test = False
     data_path = "data\\"
     
-    options = ["Select league",
+    options = ["Select leagues",
                "Change history range",
                "Change probability cutoff",
                "Change game date",
                "Switch update requesting",
                "Switch test mode",
                "Run predictions",
+               "Clear selected leagues",
                "Exit"
                ]
     numbered_options = list(enumerate(options, 1))
@@ -546,10 +563,13 @@ def main_menu():
     option_sel = ""
     while True:
         print()
-        print("Selected league: " + selected_league[0] + "'s " + selected_league[1])
+        print("Selected league(s): ")
+        for league in selected_leagues:
+            print(league[0] + "'s " + league[1])
+        print()
         print("History range: " + str(history) + " days")
         print("Probability cutoff: " + str(cutoff) + "%")
-        print("Date (day/month/year):" + str(date.day) + "/" + str(date.month) + "/" + str(date.year))
+        print("Date (day/month/year): " + str(date.day) + "/" + str(date.month) + "/" + str(date.year))
         if update:
             print("Update requesting is on")
         else:
@@ -565,8 +585,8 @@ def main_menu():
         option_sel = input_number()
         if option_sel in available_options:
             option_sel = options[option_sel - 1]
-        if option_sel == "Select league":
-            selected_league = get_league()
+        if option_sel == "Select leagues":
+            selected_leagues = get_leagues(selected_leagues)
         if option_sel == "Change history range":
             history = get_history()
         if option_sel == "Change probability cutoff":
@@ -578,28 +598,37 @@ def main_menu():
         if option_sel == "Switch test mode":
             test = not test
         if option_sel == "Run predictions":
-            if update:
-                data = updatecompetitiondata(selected_league[0], selected_league[1], 2014, data_path)
+            if test and len(selected_leagues) > 1:
+                    print("Can only run test on one league at a time. Either reduce selections to one or disable test mode.")
             else:
-                data = getcompetitiondata(selected_league[0], selected_league[1], 2014, data_path)
-            
-            if test:
-                besthistory, bestcutoff, bestscore = runtests(data, testdays=60)
-                print("Score of {0:.2f}% with history setting of {1} and cutoff of {2}".format(bestscore, besthistory, bestcutoff))
-                confirmscore = confirmtests(data, besthistory, bestcutoff, testdays=60)
-                print("Validation score of {0:.2f}%".format(confirmscore))
-            
-                print("If the above scores seem acceptable, you should use these options")
-                print("soccerprediction.py -c \"{0}\" -l \"{1}\" -y {2} -b {3}".format(selected_league[0], selected_league[1], besthistory, bestcutoff))
-                print("\nGood Luck!")
-            else:
-                # do the prediction - now takes number of historical games to use rather than using everything
-                # added cutoff option which will printout game predictions with a probability higher than the cutoff
-                data = poissonpredict(data, date.strftime("%Y-%m-%d"), history, cutoff)
-            
-                # save our predictions
-                filename = data_path + selected_league[0] + "-" + selected_league[1].replace(" ", "-").replace("/", "-") + ".csv"
-                data.to_csv(filename)
+                if len(selected_leagues) < 1:
+                    print("No league has been selected. Select league(s) first.")
+                else:
+                    for league in selected_leagues:
+                        if update:
+                            data = updatecompetitiondata(league[0], league[1], 2014, data_path)
+                        else:
+                            data = getcompetitiondata(league[0], league[1], 2014, data_path)
+                        
+                        if test:
+                            besthistory, bestcutoff, bestscore = runtests(data, testdays=60)
+                            print("Score of {0:.2f}% with history setting of {1} and cutoff of {2}".format(bestscore, besthistory, bestcutoff))
+                            confirmscore = confirmtests(data, besthistory, bestcutoff, testdays=60)
+                            print("Validation score of {0:.2f}%".format(confirmscore))
+                        
+                            print("If the above scores seem acceptable, you should use these options")
+                            print("soccerprediction.py -c \"{0}\" -l \"{1}\" -y {2} -b {3}".format(selected_leagues[0], selected_leagues[1], besthistory, bestcutoff))
+                            print("\nGood Luck!")
+                        else:
+                            # do the prediction - now takes number of historical games to use rather than using everything
+                            # added cutoff option which will printout game predictions with a probability higher than the cutoff
+                            data = poissonpredict(data, date.strftime("%Y-%m-%d"), history, cutoff)
+                        
+                            # save our predictions
+                            filename = data_path + league[0] + "-" + league[1].replace(" ", "-").replace("/", "-") + ".csv"
+                            data.to_csv(filename)
+        if option_sel == "Clear selected leagues":
+            selected_leagues = []
         if option_sel == "Exit":
             break            
 main_menu()
