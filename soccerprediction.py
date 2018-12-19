@@ -544,16 +544,37 @@ def main_menu():
     cutoff = 50
     date = today
     update = False
-    test = False
-    data_path = "data\\"
+    data_path = "data/"
+    test_path = "test/"
+    test_filename = "test_results.csv"
+    # Create test_path if it doesn't already exist
+    if not path.exists(test_path):
+        makedirs(test_path)
     
+    column_headers = ["Country and League",
+                      "Best History",
+                      "Best Cutoff",
+                      "Best Score",
+                      "Confirm Score",
+                      "Date Added"]
+    try:
+        test_df = pd.read_csv(test_path + test_filename, names = column_headers, header = 0)
+        if test_df.empty or list(test_df.columns) != column_headers:
+            test_df = pd.DataFrame([], columns = column_headers)
+        else:
+            print(test_filename + " loaded successfully.")
+
+    except FileNotFoundError:
+            test_df = pd.DataFrame([], columns = column_headers)
+
     options = ["Select leagues",
                "Change history range",
                "Change probability cutoff",
                "Change game date",
                "Switch update requesting",
-               "Switch test mode",
-               "Run predictions",
+               "Run tests",
+               "Run predictions with selected settings",
+               "Run predictions using " + test_filename + " where available",
                "Clear selected leagues",
                "Exit"
                ]
@@ -575,10 +596,7 @@ def main_menu():
             print("Update requesting is on")
         else:
             print("Update requesting is off")
-        if test:
-            print("Test mode is on")
-        else:
-            print("Test mode is off")
+        print()
         print()
         for option in numbered_options:
             print(option[0], option[1])
@@ -596,56 +614,118 @@ def main_menu():
             date = get_date()
         if option_sel == "Switch update requesting":
             update = not update
-        if option_sel == "Switch test mode":
-            test = not test
-        if option_sel == "Run predictions":
+        if option_sel == "Run tests":
             if len(selected_leagues) < 1:
                 print("No league has been selected. Select league(s) first.")
             else:
                 results_text = ""
-                results = []
+                results = {"Country": [],
+                           "League": [],
+                           "Best History": [],
+                           "Best Cutoff": [],
+                           "Best Score": [],
+                           "Confirm Score": []
+                           }
                 for league in selected_leagues:
                     if update:
                         data = updatecompetitiondata(league[0], league[1], 2014, data_path)
                     else:
                         data = getcompetitiondata(league[0], league[1], 2014, data_path)
                     
-                    if test:
-                        best_history, best_cutoff, best_score = runtests(data, testdays=60)
-                        if len(selected_leagues) < 2:
-                            print("Score of {0:.2f}% with history setting of {1} and cutoff of {2}".format(best_score, best_history, best_cutoff))
-                        confirm_score = confirmtests(data, best_history, best_cutoff, testdays=60)
-                        if len(selected_leagues) < 2:
-                            print("Validation score of {0:.2f}%".format(confirm_score))
-                            print("If the above scores seem acceptable, you should use these options")
-                            print("Via command line: soccerprediction.py -c \"{0}\" -l \"{1}\" -y {2} -b {3}".format(league[0], league[1], best_history, best_cutoff))
-                            print("Via menu system:\nLeague: " + league[0] + "'s " + league[1] +"\nHistory range: " + str(best_history) + "\nProbability cutoff: " + str(best_cutoff))
-                            print("\nGood Luck!")
-                        results.append((league[0], league[1], best_history, best_cutoff, best_score, confirm_score))
+                    best_history, best_cutoff, best_score = runtests(data, testdays=60)
+                    if len(selected_leagues) < 2:
+                        print("Score of {0:.2f}% with history setting of {1} and cutoff of {2}".format(best_score, best_history, best_cutoff))
+                    confirm_score = confirmtests(data, best_history, best_cutoff, testdays=60)
+                    if len(selected_leagues) < 2:
+                        print("Validation score of {0:.2f}%".format(confirm_score))
+                        print("If the above scores seem acceptable, you should use these options")
+                        print("Via command line: soccerprediction.py -c \"{0}\" -l \"{1}\" -y {2} -b {3}".format(league[0], league[1], best_history, best_cutoff))
+                        print("Via menu system:\nLeague: " + league[0] + "'s " + league[1] +"\nHistory range: " + str(best_history) + "\nProbability cutoff: " + str(best_cutoff))
+                        print("\nGood Luck!")
+                    if league[0] not in results["Country"] and league[1] not in results["League"]:
+                        results["Country"].append(league[0])
+                        results["League"].append(league[1])
+                        results["Best History"].append(best_history)
+                        results["Best Cutoff"].append(best_cutoff)
+                        results["Best Score"].append(best_score)
+                        results["Confirm Score"].append(confirm_score)
+                    
+                    # Add test results to test dataframe
+                    test_df = test_df.append(pd.Series([league[0] + " " + league[1],
+                                best_history,
+                                best_cutoff,
+                                best_score,
+                                confirm_score,
+                                today.strftime("%d-%m-%Y")
+                                ], name = league[0] + " " + league[1], index = test_df.columns))
                         
-                    else:
-                        # do the prediction - now takes number of historical games to use rather than using everything
-                        # added cutoff option which will printout game predictions with a probability higher than the cutoff
-                        data = poissonpredict(data, date.strftime("%Y-%m-%d"), history, cutoff)
-                        # save our predictions
-                        filename = data_path + league[0] + "-" + league[1].replace(" ", "-").replace("/", "-") + ".csv"
-                        data.to_csv(filename)
-                        results.append([data])
-                if test:
-                    for res in results:
-                        results_text += "\n" + res[0] + "'s " + res[1] + "\nBest history range: " + str(res[2]) + "\nBest cutoff: " + str(res[3]) + "\nConfirm score" + str(res[4]) + "\n\n"
+                    # Drop duplicates keeping the last addition
+                    test_df = test_df.drop_duplicates(subset = "Country and League", keep = "last")
+                    
+                    # Save updated test DataFrame
+                    test_df.to_csv(test_path + test_filename, index_label = "Country and League")
+                    print(test_filename + " Updated")
+                        
+                for res_index in range(len(results["League"])):
+                    results_text += "\n" + results["Country"][res_index] + results["League"][res_index] + "\nBest history range: " + str(results["Best History"][res_index]) + "\nBest cutoff: " + str(results["Best Cutoff"][res_index]) + "\nBest score: " + str(results["Best Score"][res_index]) + "\nValidation score: " + str(results["Confirm Score"][res_index]) + "\n\n"
 
-                    t = datetime.datetime.today()
-                    filename = "results-" + str(t.day) + "-" + str(t.month) + "-" + str(t.year) + "-" + str(t.hour) + "-" + str(t.minute) + ".txt"
-                    
-                    print()
-                    print(results_text)
-                    
-                    with open(data_path + filename, "w") as f:
-                        f.write(results_text)
-                    
-                    print("Results have been saved to " + filename)
+                t = datetime.datetime.today()
+                filename = "results-" + str(t.day) + "-" + str(t.month) + "-" + str(t.year) + "-" + str(t.hour) + "-" + str(t.minute) + ".txt"
                 
+                print()
+                print(results_text)
+                
+                with open(test_path + filename, "w") as f:
+                    f.write(results_text)
+                print("Results have been saved to " + filename)
+                    
+                    
+                    
+        if option_sel == "Run predictions with selected settings":
+            if len(selected_leagues) < 1:
+                print("No league has been selected. Select league(s) first.")
+            else:
+                for league in selected_leagues:
+                    if update:
+                        data = updatecompetitiondata(league[0], league[1], 2014, data_path)
+                    else:
+                        data = getcompetitiondata(league[0], league[1], 2014, data_path)
+                    
+                    # do the prediction - now takes number of historical games to use rather than using everything
+                    # added cutoff option which will printout game predictions with a probability higher than the cutoff
+                    data = poissonpredict(data, date.strftime("%Y-%m-%d"), history, cutoff)
+                    # save our predictions
+                    filename = data_path + league[0].replace(" ", "-").replace("/", "-") + "-" + league[1].replace(" ", "-").replace("/", "-") + ".csv"
+                    data.to_csv(filename)
+                    
+        if option_sel == "Run predictions using " + test_filename + " where available":
+            if len(selected_leagues) < 1:
+                print("No league has been selected. Select league(s) first.")
+            else:
+                for league in selected_leagues:
+                    if update:
+                        data = updatecompetitiondata(league[0], league[1], 2014, data_path)
+                    else:
+                        data = getcompetitiondata(league[0], league[1], 2014, data_path)
+                    
+                    # If the settings are available in the loaded csv file, select them.
+                    # Otherwise use the selected settings.
+                    try:
+                        sel_history = test_df.loc[league[0] + " " + league[1], "Best History"]
+                        sel_cutoff = test_df.loc[league[0] + " " + league[1], "Best Cutoff"]
+                        print("Using " + test_filename + " data.")
+                    except KeyError:
+                        sel_history = history
+                        sel_cutoff = cutoff
+                        print("Using selected settings.")
+                        
+                    # do the prediction - now takes number of historical games to use rather than using everything
+                    # added cutoff option which will printout game predictions with a probability higher than the cutoff
+                    data = poissonpredict(data, date.strftime("%Y-%m-%d"), sel_history, sel_cutoff)
+                    # save our predictions
+                    filename = data_path + league[0].replace(" ", "-").replace("/", "-") + "-" + league[1].replace(" ", "-").replace("/", "-") + ".csv"
+                    data.to_csv(filename)
+                    
         if option_sel == "Clear selected leagues":
             selected_leagues = []
         if option_sel == "Exit":
